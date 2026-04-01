@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { Star, TrendingUp, Heart, MessageCircle, Copy, LogOut, Loader2 } from 'lucide-react';
@@ -11,9 +11,28 @@ export default function Dashboard() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const router = useRouter();
 
+  // 1. Define fetchFeedback outside useEffect so it's reusable
+  const fetchFeedback = useCallback(async (profileId: string) => {
+    console.log("Dashboard fetching feedback for ID:", profileId);
+
+    const { data, error } = await supabase
+      .from('feedback_entries')
+      .select('*')
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Dashboard Fetch Error:", error.message);
+    }
+    
+    console.log("Entries found in DB:", data?.length);
+    if (data) setEntries(data);
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     const initializeDashboard = async () => {
-      // 1. Check for active session
+      // Check for active session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session) {
@@ -21,7 +40,7 @@ export default function Dashboard() {
         return;
       }
 
-      // 2. Fetch the profile for the logged-in user
+      // Fetch the profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, username, full_name')
@@ -37,7 +56,7 @@ export default function Dashboard() {
       setUserProfile(profile);
       await fetchFeedback(profile.id);
 
-      // 3. Set up Real-time listener for THIS user's feedback only
+      // Real-time listener
       const channel = supabase
         .channel(`user-feedback-${profile.id}`)
         .on(
@@ -49,6 +68,7 @@ export default function Dashboard() {
             filter: `profile_id=eq.${profile.id}` 
           },
           (payload: { new: any; }) => {
+            console.log("New feedback received in real-time!", payload.new);
             setEntries((prev) => [payload.new, ...prev]);
           }
         )
@@ -60,19 +80,7 @@ export default function Dashboard() {
     };
 
     initializeDashboard();
-  }, [router]);
-
-  async function fetchFeedback(profileId: string) {
-    const { data, error } = await supabase
-      .from('feedback_entries')
-      .select('*')
-      .eq('profile_id', profileId)
-      .order('created_at', { ascending: false });
-
-    if (error) console.error("Error fetching feedback:", error);
-    if (data) setEntries(data);
-    setLoading(false);
-  }
+  }, [router, fetchFeedback]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -100,10 +108,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-12 font-sans">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-12 font-sans text-slate-900">
       <div className="max-w-5xl mx-auto">
         
-        {/* HEADER SECTION */}
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">
@@ -115,7 +122,7 @@ export default function Dashboard() {
           <div className="flex gap-3">
             <button 
               onClick={copyLink}
-              className="bg-white border border-slate-200 px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm"
+              className="bg-white border border-slate-200 px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm text-slate-700"
             >
               <Copy size={16} /> Copy My Link
             </button>
@@ -129,14 +136,12 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* STAT CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <StatCard title="Average Rating" value={`${avgRating} / 5`} icon={<Star className="text-yellow-500 fill-yellow-500" />} />
           <StatCard title="Recommendation" value={`${recPercentage}%`} icon={<Heart className="text-red-500 fill-red-500" />} />
           <StatCard title="Total Feedback" value={total} icon={<MessageCircle className="text-blue-500" />} />
         </div>
 
-        {/* FEEDBACK LIST */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-slate-50/50">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
