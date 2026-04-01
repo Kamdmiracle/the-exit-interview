@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { Star, Send, CheckCircle } from 'lucide-react';
+import { supabase } from '../../../lib/supabase'; // Using the '@' shortcut is cleaner
+import { Star, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function FeedbackForm({ profileId }: { profileId: string }) {
   const [rating, setRating] = useState(0);
@@ -12,7 +12,6 @@ export default function FeedbackForm({ profileId }: { profileId: string }) {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // ✅ 1. THE MANAGER: This runs immediately when the page opens
   useEffect(() => {
     const hasSubmitted = localStorage.getItem(`submitted_${profileId}`);
     if (hasSubmitted) {
@@ -20,16 +19,16 @@ export default function FeedbackForm({ profileId }: { profileId: string }) {
     }
   }, [profileId]);
 
-  // ✅ 2. THE TOOL: This only runs when the button is clicked
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0 || recommend === null) return alert("Please fill out all fields!");
+    if (rating === 0 || recommend === null) return alert("Please select a star rating and a recommendation!");
 
     setLoading(true);
     
+    // IMPORTANT: Make sure your table column is exactly 'profile_id'
     const { error } = await supabase.from('feedback_entries').insert([
       {
-        profile_id: profileId,
+        profile_id: profileId, 
         rating,
         return_likelihood: returnLikelihood,
         recommend,
@@ -40,10 +39,11 @@ export default function FeedbackForm({ profileId }: { profileId: string }) {
     setLoading(false);
     
     if (error) {
-      alert("Something went wrong. Try again.");
+      // THIS IS THE FIX: This will tell us the exact database error
+      console.error("Submission Error:", error);
+      alert(`Database Error: ${error.message}. Check your RLS policies or column names!`);
     } else {
       setSubmitted(true);
-      // ✅ 3. THE MEMORY: This tells the manager they already voted
       localStorage.setItem(`submitted_${profileId}`, 'true');
     }
   };
@@ -54,13 +54,19 @@ export default function FeedbackForm({ profileId }: { profileId: string }) {
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h2 className="text-2xl font-bold">Feedback Sent!</h2>
         <p className="text-slate-500">Thank you for your honesty. Your data has been anonymized.</p>
+        <button 
+           onClick={() => setSubmitted(false)} 
+           className="mt-6 text-sm text-blue-600 font-medium hover:underline"
+        >
+          Submit another (Debug Mode)
+        </button>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* ... the rest of your form HTML is perfect ... */}
+      {/* RATING */}
       <div>
         <label className="block font-semibold mb-2">Overall Experience (1-5)</label>
         <div className="flex gap-2">
@@ -77,8 +83,9 @@ export default function FeedbackForm({ profileId }: { profileId: string }) {
         </div>
       </div>
 
+      {/* LIKELIHOOD */}
       <div>
-        <label className="block font-semibold mb-2">Likelihood to return? (1-10)</label>
+        <label className="block font-semibold mb-2">Likelihood to return? ({returnLikelihood}/10)</label>
         <input 
           type="range" min="1" max="10" 
           value={returnLikelihood} 
@@ -87,41 +94,44 @@ export default function FeedbackForm({ profileId }: { profileId: string }) {
         />
       </div>
 
+      {/* RECOMMENDATION */}
       <div>
         <label className="block font-semibold mb-2">Would you recommend them to a friend?</label>
         <div className="flex gap-4">
           <button
             type="button"
             onClick={() => setRecommend(true)}
-            className={`flex-1 py-3 rounded-xl border-2 transition ${recommend === true ? 'bg-green-50 border-green-500 text-green-700' : 'border-slate-100 text-slate-500'}`}
+            className={`flex-1 py-3 rounded-xl border-2 transition font-bold ${recommend === true ? 'bg-green-50 border-green-500 text-green-700' : 'border-slate-100 text-slate-500'}`}
           >
             Yes
           </button>
           <button
             type="button"
             onClick={() => setRecommend(false)}
-            className={`flex-1 py-3 rounded-xl border-2 transition ${recommend === false ? 'bg-red-50 border-red-500 text-red-700' : 'border-slate-100 text-slate-500'}`}
+            className={`flex-1 py-3 rounded-xl border-2 transition font-bold ${recommend === false ? 'bg-red-50 border-red-500 text-red-700' : 'border-slate-100 text-slate-500'}`}
           >
             No
           </button>
         </div>
       </div>
 
+      {/* COMMENT */}
       <div>
-        <label className="block font-semibold mb-2">Any parting words?</label>
+        <label className="block font-semibold mb-2 text-slate-700">Any parting words?</label>
         <textarea
           placeholder="Be honest, but keep it constructive..."
-          className="w-full p-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:outline-none h-32"
+          className="w-full p-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:outline-none h-32 transition"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
         />
       </div>
 
+      {/* SUBMIT */}
       <button
         disabled={loading}
-        className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-800 transition disabled:opacity-50"
+        className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-800 transition transform active:scale-95 disabled:opacity-50"
       >
-        {loading ? "Sending..." : <><Send size={18} /> Submit Interview</>}
+        {loading ? "Sending Feedback..." : <><Send size={18} /> Submit Interview</>}
       </button>
     </form>
   );
