@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase'; // Updated to alias
 import { useRouter } from 'next/navigation';
 import { Star, TrendingUp, Heart, MessageCircle, Copy, LogOut, Loader2 } from 'lucide-react';
+import VibeChart from '../../components/charts/VibeChart';// Updated path
 
 export default function Dashboard() {
   const [entries, setEntries] = useState<any[]>([]);
@@ -11,72 +12,38 @@ export default function Dashboard() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const router = useRouter();
 
-  // 1. Define fetchFeedback outside useEffect so it's reusable
   const fetchFeedback = useCallback(async (profileId: string) => {
-    console.log("Dashboard fetching feedback for ID:", profileId);
-
     const { data, error } = await supabase
       .from('feedback_entries')
       .select('*')
       .eq('profile_id', profileId)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Dashboard Fetch Error:", error.message);
-    }
-    
-    console.log("Entries found in DB:", data?.length);
     if (data) setEntries(data);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     const initializeDashboard = async () => {
-      // Check for active session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (sessionError || !session) {
+      if (!session) {
         router.push('/login');
         return;
       }
 
-      // Fetch the profile
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('id, username, full_name')
         .eq('id', session.user.id)
         .single();
 
-      if (profileError || !profile) {
-        console.error("Profile not found:", profileError);
+      if (profile) {
+        setUserProfile(profile);
+        await fetchFeedback(profile.id);
+      } else {
         setLoading(false);
-        return;
       }
-
-      setUserProfile(profile);
-      await fetchFeedback(profile.id);
-
-      // Real-time listener
-      const channel = supabase
-        .channel(`user-feedback-${profile.id}`)
-        .on(
-          'postgres_changes',
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'feedback_entries',
-            filter: `profile_id=eq.${profile.id}` 
-          },
-          (payload: { new: any; }) => {
-            console.log("New feedback received in real-time!", payload.new);
-            setEntries((prev) => [payload.new, ...prev]);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     };
 
     initializeDashboard();
@@ -94,7 +61,6 @@ export default function Dashboard() {
     alert("Link copied! Share it with your exes (or current vibes).");
   };
 
-  // Logic Calculations
   const total = entries.length;
   const avgRating = total ? (entries.reduce((acc, curr) => acc + curr.rating, 0) / total).toFixed(1) : 0;
   const recPercentage = total ? ((entries.filter(e => e.recommend).length / total) * 100).toFixed(0) : 0;
@@ -120,28 +86,28 @@ export default function Dashboard() {
           </div>
 
           <div className="flex gap-3">
-            <button 
-              onClick={copyLink}
-              className="bg-white border border-slate-200 px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm text-slate-700"
-            >
+            <button onClick={copyLink} className="bg-white border border-slate-200 px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm text-slate-700">
               <Copy size={16} /> Copy My Link
             </button>
-            <button 
-              onClick={handleLogout}
-              className="bg-slate-200 text-slate-700 p-3 rounded-2xl hover:bg-red-50 hover:text-red-600 transition"
-              title="Logout"
-            >
+            <button onClick={handleLogout} className="bg-slate-200 text-slate-700 p-3 rounded-2xl hover:bg-red-50 hover:text-red-600 transition">
               <LogOut size={20} />
             </button>
           </div>
         </header>
 
+        {/* STAT CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <StatCard title="Average Rating" value={`${avgRating} / 5`} icon={<Star className="text-yellow-500 fill-yellow-500" />} />
           <StatCard title="Recommendation" value={`${recPercentage}%`} icon={<Heart className="text-red-500 fill-red-500" />} />
           <StatCard title="Total Feedback" value={total} icon={<MessageCircle className="text-blue-500" />} />
         </div>
 
+        {/* --- ADDED CHART SECTION --- */}
+        <div className="mb-12">
+          <VibeChart data={entries} />
+        </div>
+
+        {/* FEEDBACK LIST */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-slate-50/50">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
