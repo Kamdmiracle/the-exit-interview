@@ -120,7 +120,7 @@ export default function Dashboard() {
               <div className="p-12 text-center text-slate-400 italic">No feedback received yet. Share your link!</div>
             ) : (
               entries.map((entry) => (
-                <div key={entry.id} className="p-6 hover:bg-slate-50 transition">
+                <><div key={entry.id} className="p-6 hover:bg-slate-50 transition">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex gap-1">
                       {[...Array(5)].map((_, i) => (
@@ -138,7 +138,28 @@ export default function Dashboard() {
                     </span>
                     <span className="text-slate-400 bg-slate-100 px-2 py-1 rounded">Return Score: {entry.return_likelihood}/10</span>
                   </div>
-                </div>
+                </div><div key={entry.id} className="p-8 hover:bg-slate-50 transition border-b">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex gap-1">
+                        {[...Array(5)].map((_, i) => <Star key={i} size={16} className={i < entry.rating ? "fill-yellow-400 text-yellow-400" : "text-slate-100"} />)}
+                      </div>
+                      <span className="text-xs font-mono text-slate-400 uppercase">{new Date(entry.created_at).toLocaleDateString()}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <StatMini label="Satisfaction" value={`${entry.satisfaction}/5`} />
+                      <StatMini label="Energy" value={`${entry.energy_chemistry}/5`} />
+                      <StatMini label="Duration" value={entry.duration_rating} />
+                      <StatMini label="Recommend" value={entry.recommend} />
+                    </div>
+
+                    <p className="text-slate-800 leading-relaxed bg-slate-100 p-4 rounded-2xl italic">"{entry.comment}"</p>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {entry.one_word && <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full"># {entry.one_word}</span>}
+                      <span className="px-3 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-full">Highlight: {entry.highlight}</span>
+                    </div>
+                  </div></>
               ))
             )}
           </div>
@@ -156,6 +177,15 @@ function StatCard({ title, value, icon }: { title: string; value: any; icon: any
         <p className="text-3xl font-black text-slate-900">{value}</p>
       </div>
       <div className="bg-slate-50 p-4 rounded-2xl">{icon}</div>
+    </div>
+  );
+}
+
+function StatMini({ label, value }: any) {
+  return (
+    <div>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className="text-sm font-bold text-slate-700">{value || 'N/A'}</p>
     </div>
   );
 }

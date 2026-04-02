@@ -1,138 +1,174 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '../../../lib/supabase'; // Using the '@' shortcut is cleaner
-import { Star, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { supabase } from '../../../lib/supabase';
+import { Star, Send, CheckCircle, Heart, MessageSquare, Zap, Smile } from 'lucide-react';
 
 export default function FeedbackForm({ profileId }: { profileId: string }) {
-  const [rating, setRating] = useState(0);
-  const [returnLikelihood, setReturnLikelihood] = useState(5);
-  const [recommend, setRecommend] = useState<boolean | null>(null);
-  const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // --- STATE FOR ALL QUESTIONS ---
+  const [formData, setFormData] = useState({
+    rating: 0, recommend: null as boolean | string | null, return_likelihood: 5,
+    comm_before: 0, comfort_level: '', energy_chemistry: 0,
+    satisfaction: 0, prioritize_enjoyment: '', adventurousness: 5, duration_rating: '',
+    aftercare_vibe: 0, appreciated: '', exit_vibe: '',
+    highlight: '', improvement: '', one_word: '', comment: '',
+    collab_again: '', surprises: ''
+  });
+
   useEffect(() => {
-    const hasSubmitted = localStorage.getItem(`submitted_${profileId}`);
-    if (hasSubmitted) {
-      setSubmitted(true); 
-    }
+    if (localStorage.getItem(`submitted_${profileId}`)) setSubmitted(true);
   }, [profileId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0 || recommend === null) return alert("Please select a star rating and a recommendation!");
-
+    if (formData.rating === 0) return alert("Please at least give an overall rating!");
     setLoading(true);
-    
-    // IMPORTANT: Make sure your table column is exactly 'profile_id'
-    const { error } = await supabase.from('feedback_entries').insert([
-      {
-        profile_id: profileId, 
-        rating,
-        return_likelihood: returnLikelihood,
-        recommend,
-        comment,
-      },
-    ]);
+
+    const { error } = await supabase.from('feedback_entries').insert([{
+      profile_id: profileId,
+      ...formData
+    }]);
 
     setLoading(false);
-    
     if (error) {
-      // THIS IS THE FIX: This will tell us the exact database error
-      console.error("Submission Error:", error);
-      alert(`Database Error: ${error.message}. Check your RLS policies or column names!`);
+      alert(`Error: ${error.message}`);
     } else {
       setSubmitted(true);
       localStorage.setItem(`submitted_${profileId}`, 'true');
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="text-center py-10 animate-in zoom-in duration-300">
-        <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold">Feedback Sent!</h2>
-        <p className="text-slate-500">Thank you for your honesty. Your data has been anonymized.</p>
-        <button 
-           onClick={() => setSubmitted(false)} 
-           className="mt-6 text-sm text-blue-600 font-medium hover:underline"
-        >
-          Submit another (Debug Mode)
-        </button>
-      </div>
-    );
-  }
+  if (submitted) return (
+    <div className="text-center py-20 bg-white rounded-3xl shadow-xl">
+      <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-4 animate-bounce" />
+      <h2 className="text-3xl font-black">Vibe Check Sent!</h2>
+      <p className="text-slate-500 mt-2">Your honesty is appreciated. Stay safe.</p>
+    </div>
+  );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      {/* RATING */}
-      <div>
-        <label className="block font-semibold mb-2">Overall Experience (1-5)</label>
-        <div className="flex gap-2">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => setRating(star)}
-              className={`p-2 transition ${rating >= star ? 'text-yellow-500' : 'text-slate-300'}`}
-            >
-              <Star fill={rating >= star ? 'currentColor' : 'none'} size={32} />
-            </button>
-          ))}
-        </div>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-12 pb-20">
+      
+      {/* SECTION 1: OVERALL */}
+      <FormSection title="Overall Experience" icon={<Star className="text-yellow-500" />}>
+        <RatingLabel label="Overall Rating (1-5)" value={formData.rating} onChange={(v: any) => setFormData({...formData, rating: v})} />
+        
+        <ChoiceLabel label="Would you recommend?" options={['Yes', 'No', 'Maybe']} 
+          value={formData.recommend} onChange={(v: any) => setFormData({...formData, recommend: v})} />
 
-      {/* LIKELIHOOD */}
-      <div>
-        <label className="block font-semibold mb-2">Likelihood to return? ({returnLikelihood}/10)</label>
-        <input 
-          type="range" min="1" max="10" 
-          value={returnLikelihood} 
-          onChange={(e) => setReturnLikelihood(parseInt(e.target.value))}
-          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-        />
-      </div>
+        <RangeLabel label="Likelihood to return" min={1} max={10} value={formData.return_likelihood} 
+          onChange={(v: any) => setFormData({...formData, return_likelihood: v})} />
+      </FormSection>
 
-      {/* RECOMMENDATION */}
-      <div>
-        <label className="block font-semibold mb-2">Would you recommend them to a friend?</label>
-        <div className="flex gap-4">
-          <button
-            type="button"
-            onClick={() => setRecommend(true)}
-            className={`flex-1 py-3 rounded-xl border-2 transition font-bold ${recommend === true ? 'bg-green-50 border-green-500 text-green-700' : 'border-slate-100 text-slate-500'}`}
-          >
-            Yes
-          </button>
-          <button
-            type="button"
-            onClick={() => setRecommend(false)}
-            className={`flex-1 py-3 rounded-xl border-2 transition font-bold ${recommend === false ? 'bg-red-50 border-red-500 text-red-700' : 'border-slate-100 text-slate-500'}`}
-          >
-            No
-          </button>
-        </div>
-      </div>
+      {/* SECTION 2: THE VIBE */}
+      <FormSection title="The Vibe" icon={<Zap className="text-blue-500" />}>
+        <RatingLabel label="Communication beforehand" value={formData.comm_before} onChange={(v: any) => setFormData({...formData, comm_before: v})} />
+        
+        <ChoiceLabel label="Did you feel at ease?" options={['Yes', 'Somewhat', 'No']} 
+          value={formData.comfort_level} onChange={(v: any) => setFormData({...formData, comfort_level: v})} />
 
-      {/* COMMENT */}
-      <div>
-        <label className="block font-semibold mb-2 text-slate-700">Any parting words?</label>
-        <textarea
-          placeholder="Be honest, but keep it constructive..."
-          className="w-full p-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:outline-none h-32 transition"
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-        />
-      </div>
+        <RatingLabel label="Energy / Chemistry" value={formData.energy_chemistry} onChange={(v: any) => setFormData({...formData, energy_chemistry: v})} />
+      </FormSection>
 
-      {/* SUBMIT */}
-      <button
-        disabled={loading}
-        className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-800 transition transform active:scale-95 disabled:opacity-50"
-      >
-        {loading ? "Sending Feedback..." : <><Send size={18} /> Submit Interview</>}
+      {/* SECTION 3: THE MAIN EVENT */}
+      <FormSection title="The Main Event" icon={<Heart className="text-red-500" />}>
+        <RatingLabel label="Satisfaction Level" value={formData.satisfaction} onChange={(v: any) => setFormData({...formData, satisfaction: v})} />
+        
+        <ChoiceLabel label="Did they prioritize your enjoyment?" options={['Always', 'Sometimes', 'Not really']} 
+          value={formData.prioritize_enjoyment} onChange={(v: any) => setFormData({...formData, prioritize_enjoyment: v})} />
+
+        <RangeLabel label="Adventurousness (Vanilla → Wild)" min={1} max={10} value={formData.adventurousness} 
+          onChange={(v: any) => setFormData({...formData, adventurousness: v})} />
+
+        <ChoiceLabel label="Duration" options={['Too short', 'Just right', 'Too long']} 
+          value={formData.duration_rating} onChange={(v: any) => setFormData({...formData, duration_rating: v})} />
+      </FormSection>
+
+      {/* SECTION 4: AFTERCARE */}
+      <FormSection title="Aftercare & Exit" icon={<Smile className="text-purple-500" />}>
+        <RatingLabel label="Post-experience vibe" value={formData.aftercare_vibe} onChange={(v: any) => setFormData({...formData, aftercare_vibe: v})} />
+        <ChoiceLabel label="Were you made to feel appreciated?" options={['Yes', 'No', 'Somewhat']} 
+          value={formData.appreciated} onChange={(v: any) => setFormData({...formData, appreciated: v})} />
+        <ChoiceLabel label="Exit Style" options={['Very Smooth', 'Neutral', 'Awkward']} 
+          value={formData.exit_vibe} onChange={(v: any) => setFormData({...formData, exit_vibe: v})} />
+      </FormSection>
+
+      {/* SECTION 5: OPEN ENDED */}
+      <FormSection title="Parting Thoughts" icon={<MessageSquare className="text-slate-500" />}>
+        <textarea placeholder="Highlight of the experience?" className="w-full p-4 border-2 rounded-2xl h-24 mb-4" 
+          value={formData.highlight} onChange={(e) => setFormData({...formData, highlight: e.target.value})} />
+        
+        <textarea placeholder="What could be improved?" className="w-full p-4 border-2 rounded-2xl h-24 mb-4" 
+          value={formData.improvement} onChange={(e) => setFormData({...formData, improvement: e.target.value})} />
+
+        <input placeholder="One word to describe it?" className="w-full p-4 border-2 rounded-2xl mb-4" 
+          value={formData.one_word} onChange={(e) => setFormData({...formData, one_word: e.target.value})} />
+
+        <textarea placeholder="Any other comments?" className="w-full p-4 border-2 rounded-2xl h-32" 
+          value={formData.comment} onChange={(e) => setFormData({...formData, comment: e.target.value})} />
+      </FormSection>
+
+      <button disabled={loading} className="w-full bg-slate-900 text-white font-black py-6 rounded-3xl text-xl shadow-2xl hover:scale-[1.02] transition active:scale-95 disabled:opacity-50">
+        {loading ? "Sealing the Interview..." : "Submit Anonymous Review"}
       </button>
     </form>
+  );
+}
+
+// --- REUSABLE MINI-COMPONENTS ---
+
+function FormSection({ title, icon, children }: any) {
+  return (
+    <div className="bg-white/80 backdrop-blur-sm p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 bg-slate-50 rounded-xl">{icon}</div>
+        <h3 className="text-xl font-black text-slate-800 tracking-tight">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function RatingLabel({ label, value, onChange }: any) {
+  return (
+    <div>
+      <p className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">{label}</p>
+      <div className="flex gap-2">
+        {[1,2,3,4,5].map(s => (
+          <button key={s} type="button" onClick={() => onChange(s)} className={`transition ${value >= s ? 'text-yellow-500' : 'text-slate-200'}`}>
+            <Star size={28} fill={value >= s ? 'currentColor' : 'none'} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChoiceLabel({ label, options, value, onChange }: any) {
+  return (
+    <div>
+      <p className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt: string) => (
+          <button key={opt} type="button" onClick={() => onChange(opt)} 
+            className={`px-6 py-3 rounded-2xl border-2 font-bold transition ${value === opt ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-100'}`}>
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RangeLabel({ label, min, max, value, onChange }: any) {
+  return (
+    <div>
+      <p className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">{label}: <span className="text-blue-600">{value}</span></p>
+      <input type="range" min={min} max={max} value={value} onChange={(e) => onChange(parseInt(e.target.value))}
+        className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" />
+    </div>
   );
 }
