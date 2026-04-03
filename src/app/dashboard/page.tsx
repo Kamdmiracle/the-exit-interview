@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../../lib/supabase'; 
+import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Star, TrendingUp, Heart, MessageCircle, Copy, LogOut, Loader2, Zap, Clock } from 'lucide-react';
+import { Star, TrendingUp, Heart, MessageCircle, Copy, LogOut, Loader2, Zap, Smile, Clock, ShieldCheck } from 'lucide-react';
 import VibeChart from '../../components/charts/VibeChart';
 
 export default function Dashboard() {
@@ -13,6 +13,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   const fetchFeedback = useCallback(async (profileId: string) => {
+    // We select '*' to ensure all your new form columns are fetched
     const { data, error } = await supabase
       .from('feedback_entries')
       .select('*')
@@ -26,11 +27,7 @@ export default function Dashboard() {
   useEffect(() => {
     const initializeDashboard = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        router.push('/login');
-        return;
-      }
+      if (!session) return router.push('/login');
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -45,156 +42,166 @@ export default function Dashboard() {
         setLoading(false);
       }
     };
-
     initializeDashboard();
   }, [router, fetchFeedback]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
-
   const copyLink = () => {
-    if (!userProfile) return;
-    const url = `${window.location.origin}/rate/${userProfile.username}`;
+    const url = `${window.location.origin}/rate/${userProfile?.username}`;
     navigator.clipboard.writeText(url);
-    alert("Link copied! Share it with your vibes.");
+    alert("Link copied! Ready to share.");
   };
 
   const total = entries.length;
   const avgRating = total ? (entries.reduce((acc, curr) => acc + curr.rating, 0) / total).toFixed(1) : 0;
-  const recPercentage = total ? ((entries.filter(e => e.recommend === true || e.recommend === 'Yes').length / total) * 100).toFixed(0) : 0;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
-        <Loader2 className="animate-spin mr-2" /> Loading your stats...
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-12 font-sans text-slate-900">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-12 text-slate-900 font-sans">
+      <div className="max-w-5xl mx-auto space-y-10">
         
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        {/* HEADER */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-              Hey, {userProfile?.full_name?.split(' ')[0] || 'Kamdi'}
-            </h1>
-            <p className="text-slate-500 mt-2 font-medium italic">Your Personal Vibe Analytics</p>
+            <h1 className="text-4xl font-black tracking-tight">Hey, {userProfile?.full_name?.split(' ')[0]}</h1>
+            <p className="text-slate-500 italic">Your Detailed Vibe Analytics</p>
           </div>
-
           <div className="flex gap-3">
-            <button onClick={copyLink} className="bg-white border border-slate-200 px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm text-slate-700">
-              <Copy size={16} /> Copy My Link
+            <button onClick={copyLink} className="bg-white border px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-sm hover:bg-slate-50 transition">
+              <Copy size={16} /> Copy Link
             </button>
-            <button onClick={handleLogout} className="bg-slate-200 text-slate-700 p-3 rounded-2xl hover:bg-red-50 hover:text-red-600 transition" title="Logout">
+            <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-200 p-3 rounded-2xl hover:bg-red-50 hover:text-red-600 transition">
               <LogOut size={20} />
             </button>
           </div>
         </header>
 
-        {/* STAT CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <StatCard title="Average Rating" value={`${avgRating} / 5`} icon={<Star className="text-yellow-500 fill-yellow-500" />} />
-          <StatCard title="Recommendation" value={`${recPercentage}%`} icon={<Heart className="text-red-500 fill-red-500" />} />
-          <StatCard title="Total Feedback" value={total} icon={<MessageCircle className="text-blue-500" />} />
+        {/* TOP STATS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard title="Overall Avg" value={`${avgRating}/5`} icon={<Star className="text-yellow-500 fill-yellow-500" />} />
+          <StatCard title="Total Entries" value={total} icon={<MessageCircle className="text-blue-500" />} />
+          <StatCard title="Latest Vibe" value={entries[0]?.one_word || 'N/A'} icon={<Zap className="text-purple-500" />} />
         </div>
 
-        <div className="mb-12">
-          <VibeChart data={entries} />
-        </div>
+        <VibeChart data={entries} />
 
-        {/* FEEDBACK LIST */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <TrendingUp size={20} className="text-slate-400" /> Recent Entries
-            </h3>
-          </div>
-          
-          <div className="divide-y divide-slate-100">
-            {entries.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 italic">No feedback received yet. Share your link!</div>
-            ) : (
-              entries.map((entry) => (
-                <div key={entry.id} className="p-8 hover:bg-slate-50 transition">
-                  {/* Card Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} size={18} className={i < entry.rating ? "fill-yellow-400 text-yellow-400" : "text-slate-200"} />
-                      ))}
-                    </div>
-                    <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">
-                      {new Date(entry.created_at).toLocaleDateString()}
-                    </span>
+        {/* DETAILED ENTRIES FEED */}
+        <div className="space-y-6">
+          <h3 className="text-xl font-bold flex items-center gap-2 px-2">
+            <TrendingUp size={20} className="text-slate-400" /> Full Interview Breakdowns
+          </h3>
+
+          {entries.length === 0 ? (
+            <div className="bg-white p-20 text-center rounded-[2.5rem] border-2 border-dashed border-slate-200 text-slate-400">
+              No interviews completed yet. Share your link to start collecting data!
+            </div>
+          ) : (
+            entries.map((entry) => (
+              <div key={entry.id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden p-8 space-y-8">
+                
+                {/* 1. Header: Stars and Date */}
+                <div className="flex justify-between items-center border-b border-slate-50 pb-6">
+                  <div className="flex gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={20} className={i < entry.rating ? "fill-yellow-400 text-yellow-400" : "text-slate-100"} />
+                    ))}
                   </div>
-
-                  {/* Detailed Stats Grid (Only show if new data exists) */}
-                  {(entry.satisfaction || entry.energy_chemistry || entry.duration_rating) && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                      <StatMini label="Satisfaction" value={`${entry.satisfaction || 0}/5`} />
-                      <StatMini label="Energy" value={`${entry.energy_chemistry || 0}/5`} />
-                      <StatMini label="Duration" value={entry.duration_rating || 'N/A'} />
-                      <StatMini label="Recommend" value={typeof entry.recommend === 'boolean' ? (entry.recommend ? 'Yes' : 'No') : (entry.recommend || 'N/A')} />
-                    </div>
-                  )}
-
-                  {/* Main Comment */}
-                  <div className="relative">
-                    <p className="text-slate-800 leading-relaxed italic text-lg pr-4">
-                      "{entry.comment || "No parting words provided."}"
-                    </p>
-                  </div>
-
-                  {/* Tags & Highlights */}
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    {entry.one_word && (
-                      <span className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-sm">
-                        # {entry.one_word}
-                      </span>
-                    )}
-                    {entry.highlight && (
-                      <span className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                        Highlight: {entry.highlight}
-                      </span>
-                    )}
-                    {entry.return_likelihood && (
-                       <span className="px-4 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full">
-                       Return Score: {entry.return_likelihood}/10
-                     </span>
-                    )}
+                  <div className="text-right">
+                    <span className="text-xs font-black text-slate-300 uppercase tracking-widest block">Session Date</span>
+                    <span className="font-mono text-sm">{new Date(entry.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+
+                {/* 2. Grid Sections (Bento Style) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  
+                  {/* The Vibe Column */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <Zap size={12} /> The Vibe
+                    </h4>
+                    <DataRow label="Communication" value={`${entry.comm_before}/5`} />
+                    <DataRow label="Comfort Level" value={entry.comfort_level} />
+                    <DataRow label="Chemistry" value={`${entry.energy_chemistry}/5`} />
+                  </div>
+
+                  {/* The Event Column */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-red-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <Heart size={12} /> The Experience
+                    </h4>
+                    <DataRow label="Satisfaction" value={`${entry.satisfaction}/5`} />
+                    <DataRow label="Priority" value={entry.prioritize_enjoyment} />
+                    <DataRow label="Duration" value={entry.duration_rating} />
+                    <DataRow label="Adventure" value={`${entry.adventurousness}/10`} />
+                  </div>
+
+                  {/* Aftercare Column */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <Smile size={12} /> Aftercare
+                    </h4>
+                    <DataRow label="Post-Vibe" value={`${entry.aftercare_vibe}/5`} />
+                    <DataRow label="Appreciated" value={entry.appreciated} />
+                    <DataRow label="Exit Style" value={entry.exit_vibe} />
+                    <DataRow label="Recommend" value={typeof entry.recommend === 'boolean' ? (entry.recommend ? 'Yes' : 'No') : entry.recommend} />
+                  </div>
+                </div>
+
+                {/* 3. Open Ended / Comments */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t border-slate-50">
+                   <CommentBox label="What was the highlight?" text={entry.highlight} />
+                   <CommentBox label="What could be improved?" text={entry.improvement} />
+                </div>
+
+                <div className="bg-slate-50 rounded-3xl p-6">
+                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Final Comments</p>
+                   <p className="text-slate-700 leading-relaxed italic">"{entry.comment || "No additional comments left."}"</p>
+                   {entry.one_word && (
+                     <div className="mt-4 inline-block bg-blue-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/20">
+                       # {entry.one_word}
+                     </div>
+                   )}
+                </div>
+
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// Sub-components remains at the bottom
-function StatCard({ title, value, icon }: { title: string; value: any; icon: any }) {
+// --- HELPER COMPONENTS ---
+
+function StatCard({ title, value, icon }: any) {
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 flex items-center justify-between transition hover:shadow-md">
+    <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
-        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">{title}</p>
-        <p className="text-3xl font-black text-slate-900">{value}</p>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{title}</p>
+        <p className="text-3xl font-black">{value}</p>
       </div>
       <div className="bg-slate-50 p-4 rounded-2xl">{icon}</div>
     </div>
   );
 }
 
-function StatMini({ label, value }: any) {
+function DataRow({ label, value }: { label: string; value: any }) {
   return (
-    <div>
+    <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+      <span className="text-xs text-slate-500 font-medium">{label}</span>
+      <span className="text-sm font-bold text-slate-800">{value || 'N/A'}</span>
+    </div>
+  );
+}
+
+function CommentBox({ label, text }: { label: string; text: string }) {
+  if (!text) return null;
+  return (
+    <div className="p-4 bg-white border border-slate-100 rounded-2xl">
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-sm font-bold text-slate-700">{value || 'N/A'}</p>
+      <p className="text-sm text-slate-600 italic">"{text}"</p>
     </div>
   );
 }
